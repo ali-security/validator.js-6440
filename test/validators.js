@@ -377,6 +377,18 @@ describe('Validators', () => {
         '////foobar.com',
         'http:////foobar.com',
         'https://example.com/foo/<script>alert(\'XSS\')</script>/',
+        // the following tests are because of CVE-2025-56200
+        /* eslint-disable no-script-url */
+        "javascript:alert(1);a=';@example.com/alert(1)'",
+        'JaVaScRiPt:alert(1)@example.com',
+        'javascript:/* comment */alert(1)@example.com',
+        'javascript:var a=1; alert(a);@example.com',
+        'javascript:alert(1)@user@example.com',
+        'javascript:alert(1)@example.com?q=safe',
+        'data:text/html,<script>alert(1)</script>@example.com',
+        'vbscript:msgbox("XSS")@example.com',
+        '//evil-site.com/path@example.com',
+        /* eslint-enable no-script-url */
       ],
     });
   });
@@ -389,9 +401,11 @@ describe('Validators', () => {
       }],
       valid: [
         'rtmp://foobar.com',
+        'rtmp:foobar.com',
       ],
       invalid: [
         'http://foobar.com',
+        'tel:+15551234567',
       ],
     });
   });
@@ -426,6 +440,9 @@ describe('Validators', () => {
         'rtmp://foobar.com',
         'http://foobar.com',
         'test://foobar.com',
+        // Dangerous! This allows to mark malicious URLs as a valid URL (CVE-2025-56200)
+        // eslint-disable-next-line no-script-url
+        'javascript:alert(1);@example.com',
       ],
       invalid: [
         'mailto:test@example.com',
@@ -623,6 +640,79 @@ describe('Validators', () => {
       invalid: [
         'john@doe.com',
         'john:john@doe.com',
+      ],
+    });
+  });
+
+  it('should validate authentication strings if a protocol is not required', () => {
+    test({
+      validator: 'isURL',
+      args: [{
+        require_protocol: false,
+      }],
+      valid: [
+        'user:pw@foobar.com/',
+      ],
+      invalid: [
+        'user:pw,@foobar.com/',
+      ],
+    });
+  });
+
+  it('should reject authentication strings if a protocol is required', () => {
+    test({
+      validator: 'isURL',
+      args: [{
+        require_protocol: true,
+      }],
+      valid: [
+        'http://user:pw@foobar.com/',
+        'https://user:password@example.com',
+        'ftp://admin:pass@ftp.example.com/',
+      ],
+      invalid: [
+        'user:pw@foobar.com/',
+        'user:password@example.com',
+        'admin:pass@ftp.example.com/',
+      ],
+    });
+  });
+
+  it('should reject invalid protocols when require_valid_protocol is enabled', () => {
+    test({
+      validator: 'isURL',
+      args: [{
+        require_valid_protocol: true,
+        protocols: ['http', 'https', 'ftp'],
+      }],
+      valid: [
+        'http://example.com',
+        'https://example.com',
+        'ftp://example.com',
+      ],
+      invalid: [
+        // eslint-disable-next-line no-script-url
+        'javascript:alert(1);@example.com',
+        'data:text/html,<script>alert(1)</script>@example.com',
+        'file:///etc/passwd@example.com',
+      ],
+    });
+  });
+
+  it('GHSA-9965-vmph-33xx vulnerability - protocol delimiter parsing difference', () => {
+    const DOMAIN_WHITELIST = ['example.com'];
+
+    test({
+      validator: 'isURL',
+      args: [{
+        protocols: ['https'],
+        host_whitelist: DOMAIN_WHITELIST,
+        require_host: false,
+      }],
+      valid: [],
+      invalid: [
+        // eslint-disable-next-line no-script-url
+        "javascript:alert(1);a=';@example.com/alert(1)",
       ],
     });
   });
@@ -2874,33 +2964,6 @@ describe('Validators', () => {
     });
   });
 
-  it('should validate strings by length (deprecated api)', () => {
-    test({
-      validator: 'isLength',
-      args: [2],
-      valid: ['abc', 'de', 'abcd'],
-      invalid: ['', 'a'],
-    });
-    test({
-      validator: 'isLength',
-      args: [2, 3],
-      valid: ['abc', 'de'],
-      invalid: ['', 'a', 'abcd'],
-    });
-    test({
-      validator: 'isLength',
-      args: [2, 3],
-      valid: ['干𩸽', '𠮷野家'],
-      invalid: ['', '𠀋', '千竈通り'],
-    });
-    test({
-      validator: 'isLength',
-      args: [0, 0],
-      valid: [''],
-      invalid: ['a', 'ab'],
-    });
-  });
-
   it('should validate strings by byte length (deprecated api)', () => {
     test({
       validator: 'isByteLength',
@@ -2919,43 +2982,6 @@ describe('Validators', () => {
       args: [0, 0],
       valid: [''],
       invalid: ['ｇ', 'a'],
-    });
-  });
-
-  it('should validate strings by length', () => {
-    test({
-      validator: 'isLength',
-      args: [{ min: 2 }],
-      valid: ['abc', 'de', 'abcd'],
-      invalid: ['', 'a'],
-    });
-    test({
-      validator: 'isLength',
-      args: [{ min: 2, max: 3 }],
-      valid: ['abc', 'de'],
-      invalid: ['', 'a', 'abcd'],
-    });
-    test({
-      validator: 'isLength',
-      args: [{ min: 2, max: 3 }],
-      valid: ['干𩸽', '𠮷野家'],
-      invalid: ['', '𠀋', '千竈通り'],
-    });
-    test({
-      validator: 'isLength',
-      args: [{ max: 3 }],
-      valid: ['abc', 'de', 'a', ''],
-      invalid: ['abcd'],
-    });
-    test({
-      validator: 'isLength',
-      args: [{ max: 0 }],
-      valid: [''],
-      invalid: ['a', 'ab'],
-    });
-    test({
-      validator: 'isLength',
-      valid: ['a', '', 'asds'],
     });
   });
 

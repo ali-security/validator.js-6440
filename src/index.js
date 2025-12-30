@@ -100,7 +100,7 @@ import normalizeEmail from './lib/normalizeEmail';
 
 import isSlug from './lib/isSlug';
 
-const version = '12.2.0';
+const version = '12.2.0-sp1';
 
 const validator = {
   version,
